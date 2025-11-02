@@ -1,0 +1,79 @@
+Problem 3 - Explanation of the Go code snippet
+
+Author: Chukkaluru Sushma
+Candidate ID: Naukri1025
+Email: sushmareddychukkaluru@gmail.com
+
+----------
+Code under discussion:
+
+    package main
+
+    import "fmt"
+
+    func main() {
+        cnp := make(chan func(), 10)
+        for i := 0; i < 4; i++ {
+            go func() {
+                for f := range cnp {
+                    f()
+                }
+            }()
+        }
+        cnp <- func() {
+            fmt.Println("HERE1")
+        }
+        fmt.Println("Hello")
+    }
+
+Explanation:
+
+1. make(chan func(), 10)
+   - Creates a buffered channel capable of holding up to 10 function values (each is type func()).
+   - Useful for decoupling producers and consumers; functions are pushed to the channel and workers pull and execute them.
+
+2. for i := 0; i < 4; i++ { go func() { for f := range cnp { f() } }() }
+   - Starts 4 goroutines that act as worker consumers.
+   - Each worker repeatedly reads a function from the channel and executes it.
+
+3. cnp <- func() { fmt.Println("HERE1") }
+   - Sends a function into the channel. One of the workers should receive it and execute the print.
+
+4. fmt.Println("Hello")
+   - Prints immediately from the main goroutine.
+
+Why "HERE1" might not be printed:
+   - The main goroutine does not wait for the worker goroutines to process the channel. If the program exits
+     before a worker reads and executes the function, "HERE1" will not appear.
+   - To fix: use sync.WaitGroup or other synchronization (or close channel and ensure all tasks are done).
+
+Corrected snippet using WaitGroup (ensures HERE1 prints):
+
+    package main
+
+    import (
+        "fmt"
+        "sync"
+    )
+
+    func main() {
+        var wg sync.WaitGroup
+        cnp := make(chan func(), 10)
+
+        for i := 0; i < 4; i++ {
+            go func() {
+                for f := range cnp {
+                    f()
+                    wg.Done()
+                }
+            }()
+        }
+
+        wg.Add(1)
+        cnp <- func() { fmt.Println("HERE1") }
+
+        wg.Wait()
+        close(cnp)
+    }
+
+----------
